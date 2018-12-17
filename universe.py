@@ -121,11 +121,19 @@ def quarterly(start_year, end_year):
 
 # compute the market cap threshold, aka middle 2 quantiles
 def market_cap_quantiles(db, stocks):
+    data = get_data(db, stocks, "HISTORICAL_MARKET_CAP")
+
+    date_ranges = quarterly(1990, 2018)
+    data_merged = merge(date_ranges, data)
+    
+    for key in data_merged:
+        print(key,":",len(data_merged[key]))
     
     quantile_by_date = {}
-    data = get_data(db, stocks, "HISTORICAL_MARKET_CAP")
-    for key in data:
-        quantile_by_date[key] = np.quantile(data[key], [0.25, 0.75])
+
+    for key in data_merged:
+        quantile_by_date[key] = np.quantile(data_merged[key], [0.25, 0.75])
+
     print(quantile_by_date)
     return quantile_by_date
 
@@ -154,7 +162,6 @@ def ebitda_value(db, stocks):
 def leverage(db, stocks):
     data = get_data_multiple(db, stocks, ["ENTERPRISE_VALUE", \
             "BS_LT_BORROW"], enterprise_value_ratio, "BS_LT_BORROW")
-
     
     date_ranges = quarterly(1990, 2018)
     data_merged = merge(date_ranges, data)
@@ -208,35 +215,12 @@ def get_universe(db):
     mdict = market_cap_quantiles(db, stocks)
     edict = ebitda_value(db, stocks)
     ldict = leverage(db, stocks)
-
-    # get all valid dates from all three features
-    lset = set(ldict.keys())
-    mset = set(mdict.keys())
-    eset = set(edict.keys())
-
-    dates = lset.intersection(mset).intersection(eset)
-    print(sorted(dates))
-
-    for date in dates:
-        month = int(date[-2:])
-        year = int(date[0:4])
-        
-        # date ranges for features
-        start = datetime.datetime(year, month, 1)
-        end_feature = start + relativedelta.relativedelta(months=1)
-
-        # date ranges for returns
-        end_target = start + relativedelta.relativedelta(years = 1)
-        print(start, end_target)
-
+    
+    pass
 
 if __name__ == "__main__":
     client = get_client()
     db = client["Stocks"]
-
-    stocks = get_stock_list(db)
-    ldict = leverage(db, stocks)
-
     
-    # get_universe(db)
+    get_universe(db)
 
