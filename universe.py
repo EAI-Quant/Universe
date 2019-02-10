@@ -1,14 +1,15 @@
-import numpy as np, pandas as pd, pymongo, math
+import numpy as np
+import pymongo
+import math
 from collections import defaultdict
 from functools import partial
 import datetime
 from dateutil import relativedelta
-import math
 
 
 def format_month_string(year, month):
-    return str(year) + (str(month) if month > 9 
-            else "0" + str(month))
+    return str(year) + (str(month) if month > 9 else "0" + str(month))
+
 
 def get_client():
     return pymongo.MongoClient('localhost', 27017, maxPoolSize=100)
@@ -20,7 +21,7 @@ def get_stock_list(db):
 
 def get_data_multiple(db, stocks, query_fields, func, special):
     data_all = defaultdict(list)
-    
+
     rfields = {}
     for qf in query_fields:
         rfields[qf] = 1
@@ -33,27 +34,26 @@ def get_data_multiple(db, stocks, query_fields, func, special):
         d = list(db[stock].find({}, rfields))
         for f in query_fields:
             d = list(filter(lambda x: f in x, d))
-        
-        
-        d = list(map(lambda x: (format_month_string(x["Date"].year, \
-                x["Date"].month), func(x, special)), d))        
+
+        d = list(map(lambda x: (format_month_string(x["Date"].year,
+                                                    x["Date"].month), func(x, special)), d))
         for x in d:
             if x[0] in data_all:
                 data_all[x[0]].append(x[1])
             else:
-                data_all[x[0]]=[x[1]]
-        
-        if i == math.ceil(len(stocks)/5 * last):
-            print(100*i/len(stocks),"% complete.")
+                data_all[x[0]] = [x[1]]
+
+        if i == math.ceil(len(stocks) / 5 * last):
+            print(100 * i / len(stocks), "% complete.")
             last += 1
-    
+
     return data_all
 
 
 def get_data(db, stocks, query_field):
 
     data_all = defaultdict(list)
-    
+
     rfields = {}
     rfields[query_field] = 1
     rfields["Date"] = 1
@@ -64,18 +64,20 @@ def get_data(db, stocks, query_field):
     for i, stock in enumerate(stocks):
         d = list(db[stock].find({}, rfields))
         d = list(filter(lambda x: query_field in x, d))
-        d = list(map(lambda x: (format_month_string(x["Date"].year, \
-                x["Date"].month), x[query_field]), d))        
+        d = list(
+            map(
+                lambda x: (format_month_string(x["Date"].year, x["Date"].month), x[query_field]),
+                d))
         for x in d:
             if x[0] in data_all:
                 data_all[x[0]].append(x[1])
             else:
-                data_all[x[0]]=[x[1]]
-        
-        if i == math.ceil(len(stocks)/5 * last):
-            print(100*i/len(stocks),"% complete.")
+                data_all[x[0]] = [x[1]]
+
+        if i == math.ceil(len(stocks) / 5 * last):
+            print(100 * i / len(stocks), "% complete.")
             last += 1
-    
+
     return data_all
 
 
@@ -103,7 +105,7 @@ def merge(merge_dict, data):
     return data_merged
 
 
-# returns a dict with which quarter date bucket to map to for determining 
+# returns a dict with which quarter date bucket to map to for determining
 # membership in the universe, end_year is non-inclusive
 def quarterly(start_year, end_year):
     date_ranges = {}
@@ -112,23 +114,26 @@ def quarterly(start_year, end_year):
     year = start_year
     while year < end_year:
         date_ranges[format_month_string(year, month)] = \
-                format_month_string(year, 1 + 3 * math.floor((month - 1)/3))
+            format_month_string(year, 1 + 3 * math.floor((month - 1)/3))
         if month == 12:
             month = 1
             year += 1
         month += 1
     return date_ranges
 
+
 # compute the market cap threshold, aka middle 2 quantiles
+
+
 def market_cap_quantiles(db, stocks):
     data = get_data(db, stocks, "HISTORICAL_MARKET_CAP")
 
     date_ranges = quarterly(1990, 2018)
     data_merged = merge(date_ranges, data)
-    
+
     for key in data_merged:
-        print(key,":",len(data_merged[key]))
-    
+        print(key, ":", len(data_merged[key]))
+
     quantile_by_date = {}
 
     for key in data_merged:
@@ -140,14 +145,14 @@ def market_cap_quantiles(db, stocks):
 
 # compute the ebitda to enterprise value ratio threshold, top quantile
 def ebitda_value(db, stocks):
-    data = get_data_multiple(db, stocks, ["ENTERPRISE_VALUE", 
-        "EBITDA"], enterprise_value_ratio, "EBITDA")
-    
+    data = get_data_multiple(db, stocks, ["ENTERPRISE_VALUE", "EBITDA"],
+                             enterprise_value_ratio, "EBITDA")
+
     date_ranges = quarterly(1990, 2018)
     data_merged = merge(date_ranges, data)
 
     for key in data_merged:
-        print(key,":",len(data_merged[key]))
+        print(key, ":", len(data_merged[key]))
 
     top_quart_by_date = {}
 
@@ -160,21 +165,21 @@ def ebitda_value(db, stocks):
 
 # compute the leverage to enterprise ratio quantile, above the median
 def leverage(db, stocks):
-    data = get_data_multiple(db, stocks, ["ENTERPRISE_VALUE", \
-            "BS_LT_BORROW"], enterprise_value_ratio, "BS_LT_BORROW")
-    
+    data = get_data_multiple(db, stocks, ["ENTERPRISE_VALUE", "BS_LT_BORROW"],
+                             enterprise_value_ratio, "BS_LT_BORROW")
+
     date_ranges = quarterly(1990, 2018)
     data_merged = merge(date_ranges, data)
-    
+
     for key in data_merged:
-        print(key,":",len(data_merged[key]))
+        print(key, ":", len(data_merged[key]))
 
     # compute the median
     median_by_date = {}
 
     for key in data_merged:
         median_by_date[key] = np.quantile(data_merged[key], [0.5])
-    
+
     print(median_by_date)
     return median_by_date
 
@@ -209,18 +214,19 @@ def between_wrap(low, high):
 def get_matching(db, stocks, query_fields):
     pass
 
+
 def get_universe(db):
 
     stocks = get_stock_list(db)
     mdict = market_cap_quantiles(db, stocks)
     edict = ebitda_value(db, stocks)
     ldict = leverage(db, stocks)
-    
+
     pass
+
 
 if __name__ == "__main__":
     client = get_client()
     db = client["Stocks"]
-    
-    get_universe(db)
 
+    get_universe(db)
